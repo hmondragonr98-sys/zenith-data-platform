@@ -16,5 +16,3 @@ Proyecto centralizado para la gestión y despliegue de soluciones de datos en Az
 ## Autor
 **Héctor Mondragón Reyes**
 *Data Engineer
-
-a401d34e6ace44b1eaa658b52983e5bc8fc14e73
