@@ -31,3 +31,9 @@ resource "azurerm_storage_account" "storage" {
     project     = "mongodb-migration"
   }
 }
+
+resource "azurerm_storage_container" "data_container" {
+  name                  = "mongodb-data"
+  storage_account_name  = azurerm_storage_account.storage.name
+  container_access_type = "private"
+}
