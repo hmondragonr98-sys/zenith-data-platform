@@ -32,9 +32,33 @@ module "storage" {
 
   mongo_collections   = var.mongo_collections
 
-  adf_principal_id    = module.data-services.adf_principal_id
+  adf_principal_id    = module.adf.adf_principal_id
 
   log_analytics_workspace_id = module.observability.law_id
+}
+
+# ------------------------------------------------------------------------------------------------
+# adf.tf
+# ------------------------------------------------------------------------------------------------
+
+module "adf" {
+  source              = "../../modules/adf"
+  
+  resource_group_name = module.resource-groups.name
+  location            = var.location
+  project_name        = var.project_name
+  environment         = var.environment
+  
+  # Conectamos con el módulo de red
+
+  key_vault_id   = module.key-vault.key_vault_id
+  key_vault_uri  = module.key-vault.vault_uri
+  key_vault_name = module.key-vault.vault_name
+
+  log_analytics_workspace_id = module.observability.law_id
+
+  storage_account_id  = module.storage.storage_account_id
+  storage_account_name = module.storage.storage_account_name
 }
 
 # ------------------------------------------------------------------------------------------------
@@ -84,7 +108,7 @@ module "key-vault" {
   
   
   service_principal_ids = [
-    module.data-services.adf_principal_id,
+    module.adf.adf_principal_id,
     module.data-services.databricks_sp_object_id
   ]
 
@@ -136,7 +160,7 @@ module "private-endpoints" {
       dns_zone_id       = module.dns.dns_zone_ids["privatelink.vaultcore.azure.net"]
     }
   }
-  depends_on = [module.data-services]
+  depends_on = [module.storage, module.key-vault]
 }
 
 # ------------------------------------------------------------------------------------------------
@@ -176,17 +200,17 @@ module "adf-linked-services" {
   source             = "../../modules/adf-linked-services"
 
   # Pasando los IDs reales obtenidos de otros módulos
-  adf_id             = module.data-services.adf_id
-  adf_principal_id   = module.data-services.adf_principal_id
+  adf_id             = module.adf.adf_id
+  adf_principal_id   = module.adf.adf_principal_id
   key_vault_id       = module.key-vault.key_vault_id
   storage_account_id = module.storage.storage_account_id
   storage_account_name = module.storage.storage_account_name
 
   storage_account_primary_dfs_endpoint = module.storage.primary_dfs_endpoint
 
-  integration_runtime_name = module.data-services.ir_managed_vnet_name
+  integration_runtime_name = module.adf.ir_managed_vnet_name
 
-  integration_runtime_name_local = module.data-services.shir_name
+  integration_runtime_name_local = module.adf.shir_name
 
   depends_on = [
     module.key-vault,

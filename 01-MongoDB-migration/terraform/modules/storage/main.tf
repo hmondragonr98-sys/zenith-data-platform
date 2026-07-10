@@ -76,25 +76,6 @@ resource "azurerm_role_assignment" "db_storage_access" {
 
 
 
-resource "azurerm_role_assignment" "adf_storage_access" {
-  scope                = azurerm_storage_account.datalake.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = var.adf_principal_id
-  
-  depends_on = [azurerm_storage_account.datalake]
-}
-
-
-
-
-
-
-
-
-
-
-
-
 resource "azurerm_monitor_diagnostic_setting" "storage_diagnostics" {
   name                       = "diag-storage-to-law"
   target_resource_id         = azurerm_storage_account.datalake.id

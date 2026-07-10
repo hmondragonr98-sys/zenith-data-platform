@@ -13,7 +13,6 @@ crash.*.log
 # password, private keys, and other secrets. These should not be part of version
 # control as they are data points which are potentially sensitive and subject
 # to change depending on the environment.
-*.tfvars
 *.tfvars.json
 
 # Ignore override files as they are usually used to override resources locally and so
@@ -50,6 +49,7 @@ venv/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+.vscode
 
 
 # --- Variables de entorno / secretos ---
@@ -60,6 +60,3 @@ __pycache__/
 # --- Sistema operativo ---
 .DS_Store
 Thumbs.db
-
-# --- Excepción: SÍ queremos versionar los .tfvars.example ---
-!*.tfvars.example
