@@ -23,7 +23,7 @@ resource "azurerm_storage_account" "datalake" {
   resource_group_name      = var.resource_group_name 
   location                 = var.location
   account_tier             = "Standard"
-  account_replication_type = "LRS"
+  account_replication_type = var.replication
   is_hns_enabled           = true
 
   shared_access_key_enabled = true 
@@ -68,7 +68,6 @@ resource "azurerm_role_assignment" "db_storage_access" {
   role_definition_name = "Storage Blob Data Contributor"
   
   # Usamos el Service Principal encontrado por el data source
-  # Esto elimina el error de "Invalid index"
   principal_id         = data.azuread_service_principal.databricks_sp.object_id
   
   # Aseguramos que la asignación espere al Storage

@@ -1,10 +1,14 @@
 # ------------------------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------------------------
-# resource-groups
+# Almacenamiento de nuestro tfstate dentro del backend
 # ------------------------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------------------------
 
-resource "azurerm_resource_group" "rg" {
-  name     = "rg-${var.environment}-${var.project_name}-01"
-  location = var.location
+terraform {
+  backend "azurerm" {
+    resource_group_name  = "rg-terraform-state"
+    storage_account_name = "sttfstatemongo01"
+    container_name        = "tfstate"
+    key                   = "mongo_prod.tfstate"
+  }
 }

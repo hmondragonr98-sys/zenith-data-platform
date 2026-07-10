@@ -120,21 +120,26 @@ resource "azurerm_databricks_workspace" "db_workspace" {
     depends_on = [azurerm_databricks_workspace.db_workspace]
   }
 
-  # 4. Creación del Clúster (Serverless Configuration)
-  # resource "databricks_cluster" "serverless_cluster" {
-  #  provider = databricks.workspace  # <--- ESTA ES LA CLAVE
-    
-  #  cluster_name            = "mi-cluster-prod"
-  #  spark_version           = data.databricks_spark_version.latest_lts.id
-  #  node_type_id            = "Standard_DS3_v2" 
-  #  autotermination_minutes = 20
-    
-  #  autoscale {
-  #    min_workers = 1
-  #    max_workers = 2
-  # depends_on = [azurerm_databricks_workspace.db_workspace]
-  #}
-#}
+# ------------------------------------------------------------------------------------------------
+# Cluster de cómputo (condicional por entorno)
+# ------------------------------------------------------------------------------------------------
+
+resource "databricks_cluster" "shared_cluster" {
+  count    = var.enable_databricks_cluster ? 1 : 0
+  provider = databricks.workspace
+
+  cluster_name            = "cluster-${var.project_name}-${var.environment}"
+  spark_version            = data.databricks_spark_version.latest_lts.id
+  node_type_id             = var.databricks_node_type_id
+  autotermination_minutes = var.databricks_autotermination_minutes
+
+  autoscale {
+    min_workers = var.databricks_min_workers
+    max_workers = var.databricks_max_workers
+  }
+
+  depends_on = [azurerm_databricks_workspace.db_workspace]
+}
 
 data "azuread_service_principal" "databricks_sp" {
   display_name = "AzureDatabricks" # Este es el nombre estándar del SP de Databricks en Azure
@@ -200,6 +205,8 @@ resource "databricks_catalog" "mongo_migration" {
   name     = "mongo_migration"
   storage_root = var.storage_account_silver_url
   comment  = "Catalog central para migración MongoDB"
+  force_destroy = true
+
   lifecycle {
     prevent_destroy = false
   }
@@ -231,8 +238,7 @@ resource "databricks_schema" "gold" {
     prevent_destroy = false
   }
   
-  depends_on = [databricks_external_location.uc_ext_loc_silver,
-                databricks_external_location.uc_ext_loc_gold]
+  depends_on = [databricks_external_location.uc_ext_loc_gold]
 }
 
 # ------------------------------------------------------------------------------------------------

@@ -35,3 +35,29 @@ variable "key_vault_name" {
   type        = string
 }
 
+variable "enable_databricks_cluster" {
+  description = "Si es true, crea un cluster de cómputo dedicado. False = solo Serverless (SQL Warehouse)."
+  type        = bool
+  default     = false
+}
+
+variable "databricks_node_type_id" {
+  description = "Tipo de nodo para el cluster"
+  type        = string
+  default     = "Standard_DS3_v2"
+}
+
+variable "databricks_min_workers" {
+  type    = number
+  default = 1
+}
+
+variable "databricks_max_workers" {
+  type    = number
+  default = 1
+}
+
+variable "databricks_autotermination_minutes" {
+  type    = number
+  default = 20
+}

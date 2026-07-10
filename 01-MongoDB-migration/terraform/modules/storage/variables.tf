@@ -3,6 +3,8 @@ variable "location"            { type = string }
 variable "project_name"        { type = string }
 variable "environment"         { type = string }
 
+variable "replication"         { type = string}
+
 variable "containers" {
   type        = list(string)
   description = "Lista de nombres de los contenedores para el Data Lake"

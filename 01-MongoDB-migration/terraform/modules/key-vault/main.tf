@@ -5,11 +5,11 @@
 # ------------------------------------------------------------------------------------------------
 
 resource "azurerm_key_vault" "vault" {
-  name                     = "kv-${var.project_name}-01"
+  name                     = "kv-${var.project_name}-${var.environment}-01"
   location                 = var.location
   resource_group_name      = var.resource_group_name
   tenant_id                = var.tenant_id
-  sku_name                 = "standard"
+  sku_name                 = var.sku_name
   purge_protection_enabled = false 
   network_acls {
     default_action = "Deny"

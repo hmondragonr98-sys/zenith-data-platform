@@ -7,7 +7,7 @@
 data "azurerm_client_config" "current" {}
 
 module "resource-groups" {
-  source   = "./modules/resource-groups"
+  source   = "../../modules/resource-groups"
   
   # Terraform creará automáticamente un módulo por cada elemento en rg_list
   for_each = toset(var.module_list)
@@ -23,13 +23,12 @@ module "resource-groups" {
 # ------------------------------------------------------------------------------------------------
 
 module "storage" {
-  source = "./modules/storage"
+  source = "../../modules/storage"
 
   # Aquí ocurre la conexión:
   # Estamos extrayendo el nombre del RG creado dinámicamente para "storage"
   resource_group_name = module.resource-groups["storage"].name
   location            = var.location
-  replication = var.replication
   
   project_name = var.project_name
   environment  = var.environment
@@ -46,7 +45,7 @@ module "storage" {
 # ------------------------------------------------------------------------------------------------
 
 module "data-services" {
-  source              = "./modules/data-services"
+  source              = "../../modules/data-services"
   
   resource_group_name = module.resource-groups["data-services"].name
   location            = var.location
@@ -79,7 +78,7 @@ module "data-services" {
 # ------------------------------------------------------------------------------------------------
 
 module "key-vault" {
-  source              = "./modules/key-vault"
+  source              = "../../modules/key-vault"
   resource_group_name = module.resource-groups["key-vault"].name
   location            = var.location
   project_name        = var.project_name
@@ -100,7 +99,7 @@ module "key-vault" {
 # ------------------------------------------------------------------------------------------------
 
 module "network" {
-  source              = "./modules/network"
+  source              = "../../modules/network"
   
   # Información básica
   resource_group_name = module.resource-groups["network"].name
@@ -121,7 +120,7 @@ module "network" {
 # ------------------------------------------------------------------------------------------------
 
 module "private-endpoints" {
-  source              = "./modules/private-endpoints"
+  source              = "../../modules/private-endpoints"
   project_name        = var.project_name
   location            = var.location
   resource_group_name = module.resource-groups["network"].name
@@ -148,7 +147,7 @@ module "private-endpoints" {
 # ------------------------------------------------------------------------------------------------
 
 module "dns" {
-  source              = "./modules/dns"
+  source              = "../../modules/dns"
   resource_group_name = module.resource-groups["network"].name
   vnet_id             = module.network.vnet_id
 }
@@ -158,7 +157,7 @@ module "dns" {
 # ------------------------------------------------------------------------------------------------
 
 module "observability" {
-  source = "./modules/observability"
+  source              = "../../modules/observability"
   
   location            = var.location
   # Asumiendo que tienes un módulo de resource-groups
@@ -173,12 +172,11 @@ module "observability" {
 
 
 module "adf-linked-services" {
-  source = "./modules/adf-linked-services"
+  source             = "../../modules/adf-linked-services"
 
   # Pasando los IDs reales obtenidos de otros módulos
   adf_id             = module.data-services.adf_id
   adf_principal_id   = module.data-services.adf_principal_id
-  # cosmos_id          = module.cosmosdb.cosmos_db_account_id
   key_vault_id       = module.key-vault.key_vault_id
   storage_account_id = module.storage.storage_account_id
   storage_account_name = module.storage.storage_account_name
@@ -190,7 +188,6 @@ module "adf-linked-services" {
   integration_runtime_name_local = module.data-services.shir_name
 
   depends_on = [
-    # module.cosmosdb,
     module.key-vault,
     module.storage
   ]

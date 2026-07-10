@@ -16,7 +16,6 @@ resource "azurerm_role_assignment" "adf_to_kv" {
 
 resource "azurerm_data_factory_managed_private_endpoint" "mpe" {
   for_each = {
-   # cosmos = { id = var.cosmos_id, sub = "MongoDB" }
     kv     = { id = var.key_vault_id,     sub = "vault" }
     storage = { id = var.storage_account_id, sub = "dfs" }
   }
@@ -30,10 +29,8 @@ resource "azurerm_data_factory_managed_private_endpoint" "mpe" {
 
 
 # ------------------------------------------------------------------------------------------------
-# adf - linked services
+# adf - linked services - Resources
 # ------------------------------------------------------------------------------------------------
-
-
 
 resource "azurerm_data_factory_linked_service_data_lake_storage_gen2" "ls_storage" {
   name                = "ls-storage"
@@ -51,16 +48,15 @@ resource "azurerm_data_factory_linked_service_data_lake_storage_gen2" "ls_storag
 
 resource "azurerm_data_factory_linked_service_key_vault" "ls_kv" {
   name                     = "ls-keyvault"
-  data_factory_id    = var.adf_id
+  data_factory_id          = var.adf_id
   key_vault_id             = var.key_vault_id
   integration_runtime_name = var.integration_runtime_name
+
   depends_on = [
     azurerm_data_factory_managed_private_endpoint.mpe["kv"],
     azurerm_role_assignment.adf_to_kv
   ]
 }
-
-
 
 
 resource "azurerm_data_factory_linked_custom_service" "ls_mongo_onprem" {

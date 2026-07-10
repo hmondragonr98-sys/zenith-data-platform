@@ -1,5 +1,3 @@
-variable "replication" { type = string}
-
 variable "module_list" {
   description = "Lista de servicios para los cuales se crearán RGs y recursos"
   type        = list(string)

@@ -1,5 +1,3 @@
-variable "replication" { type = string}
-
 variable "module_list" {
   description = "Lista de servicios para los cuales se crearán RGs y recursos"
   type        = list(string)
@@ -15,7 +13,7 @@ variable "project_name" {
 variable "environment" {
   description = "Entorno del despliegue (prod, dev, uat)"
   type        = string
-  default     = "prod"
+  default     = "test"
 }
 
 variable "location" {
