@@ -37,22 +37,35 @@ resource "azurerm_databricks_workspace" "db_workspace" {
   provider "databricks" {
   alias = "workspace"
   
-  
   host                        = try(azurerm_databricks_workspace.db_workspace.workspace_url, "")
   azure_workspace_resource_id = try(azurerm_databricks_workspace.db_workspace.id, "")
   
   auth_type = "azure-cli"
 }
 
-  # 3. Consultas al API (mantenemos la versión de Spark para la compatibilidad)
-  data "databricks_spark_version" "latest_lts" {
-    provider          = databricks.workspace
-    long_term_support = true
-    depends_on = [azurerm_databricks_workspace.db_workspace]
-  }
+
+data "databricks_current_user" "me" {
+  provider = databricks.workspace
+
+  depends_on = [azurerm_databricks_workspace.db_workspace]
+}
+
+data "azuread_service_principal" "databricks_sp" {
+  display_name = "AzureDatabricks"
+}
+
+
+
+# 3. Consultas al API (mantenemos la versión de Spark para la compatibilidad)
+data "databricks_spark_version" "latest_lts" {
+  provider          = databricks.workspace
+  long_term_support = true
+  depends_on = [azurerm_databricks_workspace.db_workspace]
+}
+
 
 # ------------------------------------------------------------------------------------------------
-# Cluster de cómputo (condicional por entorno)
+# Databricks Cluster
 # ------------------------------------------------------------------------------------------------
 
 resource "databricks_cluster" "shared_cluster" {
@@ -63,6 +76,9 @@ resource "databricks_cluster" "shared_cluster" {
   spark_version            = data.databricks_spark_version.latest_lts.id
   node_type_id             = var.databricks_node_type_id
   autotermination_minutes = var.databricks_autotermination_minutes
+  data_security_mode      = "SINGLE_USER"
+
+  single_user_name = data.databricks_current_user.me.user_name
 
   autoscale {
     min_workers = var.databricks_min_workers
@@ -72,124 +88,38 @@ resource "databricks_cluster" "shared_cluster" {
   depends_on = [azurerm_databricks_workspace.db_workspace]
 }
 
-data "azuread_service_principal" "databricks_sp" {
-  display_name = "AzureDatabricks" # Este es el nombre estándar del SP de Databricks en Azure
-}
 
-
-# ------------------------------------------------------------------------------------------------
-# ------------------------------------------------------------------------------------------------
-# Databriks Unity Catalog
-# ------------------------------------------------------------------------------------------------
-# ------------------------------------------------------------------------------------------------
-
-# 1. Access Connector
-resource "azurerm_databricks_access_connector" "uc_connector" {
-  name                = "dbac-${var.project_name}"
-  resource_group_name = var.resource_group_name
-  location            = var.location
-  identity { type = "SystemAssigned" }
-}
-
-resource "azurerm_role_assignment" "uc_connector_storage" {
-  scope                = var.storage_account_id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_databricks_access_connector.uc_connector.identity[0].principal_id
-}
-
-# 2. Storage Credential
-resource "databricks_storage_credential" "uc_credential" {
-  provider = databricks.workspace
-  name     = "cred-${var.project_name}"
-  azure_managed_identity {
-    access_connector_id = azurerm_databricks_access_connector.uc_connector.id
-  }
-  lifecycle {
-    prevent_destroy = false
-  }
-}
-
-# 3. External Locations (Usando variables dinámicas)
-resource "databricks_external_location" "uc_ext_loc_silver" {
-  provider        = databricks.workspace
-  name            = "ext-loc-${var.project_name}-silver"
-  url             = var.storage_account_silver_url
-  credential_name = databricks_storage_credential.uc_credential.id
-  lifecycle {
-    prevent_destroy = false
-  }
-}
-
-resource "databricks_external_location" "uc_ext_loc_gold" {
-  provider        = databricks.workspace
-  name            = "ext-loc-${var.project_name}-gold"
-  url             = var.storage_account_gold_url
-  credential_name = databricks_storage_credential.uc_credential.id
-  lifecycle {
-    prevent_destroy = false
-  }
-}
-
-# 4. Catalog
-resource "databricks_catalog" "mongo_migration" {
-  provider = databricks.workspace
-  name     = "mongo_migration"
-  storage_root = var.storage_account_silver_url
-  comment  = "Catalog central para migración MongoDB"
-  force_destroy = true
-
-  lifecycle {
-    prevent_destroy = false
-  }
-}
-
-# 5. Schemas (Apuntando a las ubicaciones externas)
-resource "databricks_schema" "silver" {
-  provider     = databricks.workspace
-  catalog_name = databricks_catalog.mongo_migration.name
-  name         = "silver"
-  storage_root = var.storage_account_silver_url
-  comment      = "Capa Silver"
-
-  lifecycle {
-    prevent_destroy = false
-  }
-
-  depends_on = [databricks_external_location.uc_ext_loc_silver]
-}
-
-resource "databricks_schema" "gold" {
-  provider     = databricks.workspace
-  catalog_name = databricks_catalog.mongo_migration.name
-  name         = "gold"
-  storage_root = var.storage_account_gold_url
-  comment      = "Capa Gold"
-
-  lifecycle {
-    prevent_destroy = false
-  }
-  
-  depends_on = [databricks_external_location.uc_ext_loc_gold]
-}
 
 # ------------------------------------------------------------------------------------------------
 # Configuration and path for the Notebooks 
 # ------------------------------------------------------------------------------------------------
 
-# 5. Creación del Notebook
-resource "databricks_notebook" "migracion_silver" {
+# 1. Asegurar el directorio base de dominios
+resource "databricks_directory" "domains_root" {
+  provider = databricks.workspace
+  path     = "/domains"
+  depends_on = [azurerm_databricks_workspace.db_workspace]
+}
+
+resource "databricks_directory" "domain_folders" {
+  provider = databricks.workspace
+  for_each = toset(["Logistics", "Comercial", "Catalogs"])
+  
+  path       = "/domains/${each.value}"
+  depends_on = [databricks_directory.domains_root]
+}
+
+# 2. Creación de los notebooks utilizando tu misma estructura limpia
+resource "databricks_notebook" "notebooks" {
   provider = databricks.workspace
   
-  # Esta es la ruta donde se verá el notebook dentro de tu Workspace de Databricks
-  path     = "/Mongo-transformation/mongo-silver"
-  
-  
+  for_each = fileset("${path.module}/notebooks", "**/*.py")
+
+  path     = "/domains/${trimsuffix(each.value, ".py")}"
   language = "PYTHON"
-  
-  # Esta es la ruta a tu archivo local en tu máquina/repo
-  source   = "${path.module}/notebooks/mongo-silver.py"
-  
-  depends_on = [azurerm_databricks_workspace.db_workspace]
+  source   = "${path.module}/notebooks/${each.value}"
+
+  depends_on = [databricks_directory.domain_folders]
 }
 
 

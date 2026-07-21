@@ -6,7 +6,6 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 4.0"
     }
-    # Esto es lo que soluciona tu error:
     databricks = {
       source  = "databricks/databricks"
       version = ">= 1.50.0"
@@ -24,7 +23,7 @@ terraform {
 }
 
 
-# Configuración del proveedor (si aplica)
+# Configuración del proveedor
 provider "azurerm" {
   features {}
 }

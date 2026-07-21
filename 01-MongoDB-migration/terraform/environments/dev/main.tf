@@ -59,6 +59,9 @@ module "adf" {
 
   storage_account_id  = module.storage.storage_account_id
   storage_account_name = module.storage.storage_account_name
+
+  databricks_workspace_id = module.data-services.databricks_workspace_id
+  cluster_id              = module.data-services.cluster_id
 }
 
 # ------------------------------------------------------------------------------------------------
@@ -88,8 +91,16 @@ module "data-services" {
 
   storage_account_id  = module.storage.storage_account_id
   storage_account_name = module.storage.storage_account_name
+  storage_account_bronze_url = module.storage.storage_account_bronze_url
   storage_account_silver_url = module.storage.storage_account_silver_url
   storage_account_gold_url = module.storage.storage_account_gold_url
+  storage_account_control_url = module.storage.storage_account_control_url
+
+  enable_databricks_cluster             = var.enable_databricks_cluster
+  databricks_node_type_id               = var.databricks_node_type_id
+  databricks_min_workers                = var.databricks_min_workers
+  databricks_max_workers                = var.databricks_max_workers
+  databricks_autotermination_minutes    = var.databricks_autotermination_minutes
 }
 
 # ------------------------------------------------------------------------------------------------
@@ -151,7 +162,7 @@ module "private-endpoints" {
   endpoints = {
     storage = {
       resource_id       = module.storage.storage_account_id
-      subresource_names = ["blob"]
+      subresource_names = ["dfs"]
       dns_zone_id       = module.dns.dns_zone_ids["privatelink.dfs.core.windows.net"]
     }
     keyvault = {
@@ -159,9 +170,15 @@ module "private-endpoints" {
       subresource_names = ["vault"]
       dns_zone_id       = module.dns.dns_zone_ids["privatelink.vaultcore.azure.net"]
     }
+    databricks = {
+      resource_id       = module.data-services.databricks_workspace_id
+      subresource_names = ["databricks_ui_api"]
+      dns_zone_id       = module.dns.dns_zone_ids["privatelink.azuredatabricks.net"]
+    }
   }
-  depends_on = [module.storage, module.key-vault]
+  depends_on = [module.storage, module.key-vault, module.data-services]
 }
+
 
 # ------------------------------------------------------------------------------------------------
 # dns.tf
@@ -200,6 +217,7 @@ module "adf-linked-services" {
   source             = "../../modules/adf-linked-services"
 
   # Pasando los IDs reales obtenidos de otros módulos
+  environment         = var.environment
   adf_id             = module.adf.adf_id
   adf_principal_id   = module.adf.adf_principal_id
   key_vault_id       = module.key-vault.key_vault_id
@@ -212,8 +230,55 @@ module "adf-linked-services" {
 
   integration_runtime_name_local = module.adf.shir_name
 
+  enable_mongo_linked_service = var.enable_mongo_linked_service
+
+  mongo_collections = var.mongo_collections
+
+  database = var.database
+
+  cluster_id = module.data-services.cluster_id
+  databricks_workspace_id = module.data-services.databricks_workspace_id
+  databricks_workspace_url = module.data-services.databricks_workspace_url
+
   depends_on = [
     module.key-vault,
     module.storage
   ]
+}
+
+# ------------------------------------------------------------------------------------------------
+# EntraId.tf
+# ------------------------------------------------------------------------------------------------
+
+module "EntraId" {
+  source      = "../../modules/EntraId"
+  environment = var.environment
+  domains     = var.domains
+  location = var.location
+  resource_group_name = module.resource-groups.name
+}
+
+# ------------------------------------------------------------------------------------------------
+# unity_catalog.tf
+# ------------------------------------------------------------------------------------------------
+
+
+module "unity_catalog" {
+  source             = "../../modules/unity_catalog"
+
+  # Pasando los IDs reales obtenidos de otros módulos
+  location            = var.location
+  resource_group_name = module.resource-groups.name
+  project_name        = var.project_name
+  
+  storage_account_name = module.storage.storage_account_name
+  storage_account_id = module.storage.storage_account_id
+
+  storage_account_bronze_url = module.storage.storage_account_bronze_url
+  storage_account_silver_url = module.storage.storage_account_silver_url
+  storage_account_gold_url = module.storage.storage_account_gold_url
+  storage_account_control_url = module.storage.storage_account_control_url
+  
+  databricks_workspace_url = module.data-services.databricks_workspace_url
+  databricks_workspace_id = module.data-services.databricks_workspace_id
 }

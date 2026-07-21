@@ -1,10 +1,12 @@
-
+#-----------------------------------------------------------------------------------
+# DNS
+#-----------------------------------------------------------------------------------
 
 resource "azurerm_private_dns_zone" "dns_zones" {
   for_each = toset([
     "privatelink.dfs.core.windows.net",
-    "privatelink.vaultcore.azure.net"
-    # "privatelink.mongo.cosmos.azure.com"
+    "privatelink.vaultcore.azure.net",
+    "privatelink.azuredatabricks.net"
   ])
   name                = each.value
   resource_group_name = var.resource_group_name

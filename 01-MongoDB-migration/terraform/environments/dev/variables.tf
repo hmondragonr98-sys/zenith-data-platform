@@ -14,10 +14,14 @@ variable "location" {
   type        = string
 }
 
+variable "database" {
+  type    = string
+  description = "MongoDB/Json format"
+}
+
 variable "mongo_collections" {
   description = "Lista de colecciones de MongoDB a migrar"
   type        = list(string)
-  default     = ["pedidos", "productos", "usuarios", "suscripciones"]
 }
 
 variable "replication" {
@@ -42,3 +46,17 @@ variable "budget_alert_threshold" {
 
 
 variable "enable_databricks_cluster" { type = bool }
+
+variable "enable_mongo_linked_service" { type = bool }
+
+
+
+variable "databricks_node_type_id"            { type = string }
+variable "databricks_min_workers"             { type = number }
+variable "databricks_max_workers"             { type = number }
+variable "databricks_autotermination_minutes" { type = number }
+
+
+variable "domains" {
+  type = list(string)
+}

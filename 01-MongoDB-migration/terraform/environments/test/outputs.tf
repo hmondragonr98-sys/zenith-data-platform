@@ -1,7 +1,6 @@
 # terraform/outputs.tf
 
-output "resource_group_names" {
-  description = "Mapa de todos los RGs creados"
-  # module.resource-groups es el nombre del bloque que definiste en main.tf
-  value = { for key, m in module.resource-groups : key => m.name }
+output "resource_group_name" {
+  description = "Nombre del único RG del entorno"
+  value       = module.resource-groups.name
 }

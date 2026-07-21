@@ -45,6 +45,8 @@ resource "azurerm_storage_container" "medallion" {
   depends_on = [azurerm_storage_account.datalake]
 }
 
+
+
 resource "azurerm_storage_blob" "watermark_initial" {
   name                   = "watermark.json"
   storage_account_name   = azurerm_storage_account.datalake.name
@@ -62,28 +64,12 @@ resource "azurerm_storage_blob" "watermark_initial" {
 }
 
 
-# 3. Permiso para que Databricks acceda al Storage Account
-resource "azurerm_role_assignment" "db_storage_access" {
-  scope                = azurerm_storage_account.datalake.id
-  role_definition_name = "Storage Blob Data Contributor"
-  
-  # Usamos el Service Principal encontrado por el data source
-  principal_id         = data.azuread_service_principal.databricks_sp.object_id
-  
-  # Aseguramos que la asignación espere al Storage
-  depends_on           = [azurerm_storage_account.datalake]
-}
-
-
 
 resource "azurerm_monitor_diagnostic_setting" "storage_diagnostics" {
   name                       = "diag-storage-to-law"
   target_resource_id         = azurerm_storage_account.datalake.id
   log_analytics_workspace_id = var.log_analytics_workspace_id
-
-  # BORRA TODOS LOS enabled_log porque Azure confirmó que no existen para este recurso.
   
-  # Agrega solo las métricas válidas que nos dio el CLI:
   enabled_metric {
     category = "Capacity"
   }

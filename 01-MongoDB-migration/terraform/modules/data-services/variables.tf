@@ -2,10 +2,13 @@ variable "resource_group_name" { type = string }
 variable "location"            { type = string }
 variable "project_name"        { type = string }
 variable "environment"         { type = string }
-variable "storage_account_id"  { type = string } # Recibido desde el módulo storage
-variable "storage_account_name"  { type = string } # Recibido desde el módulo storage
-variable "storage_account_silver_url" {type = string}
-variable "storage_account_gold_url" {type = string}
+
+variable "storage_account_id"           { type = string } # Recibido desde el módulo storage
+variable "storage_account_name"         { type = string } # Recibido desde el módulo storage
+variable "storage_account_bronze_url"   { type = string }
+variable "storage_account_silver_url"   { type = string }
+variable "storage_account_gold_url"     { type = string }
+variable "storage_account_control_url"  { type = string }
 
 # Agrega las variables específicas de red si Databricks las requiere
 variable "vnet_id"              { type = string }
@@ -44,7 +47,6 @@ variable "enable_databricks_cluster" {
 variable "databricks_node_type_id" {
   description = "Tipo de nodo para el cluster"
   type        = string
-  default     = "Standard_DS3_v2"
 }
 
 variable "databricks_min_workers" {

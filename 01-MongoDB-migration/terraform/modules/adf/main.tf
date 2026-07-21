@@ -53,6 +53,16 @@ resource "azurerm_role_assignment" "adf_storage_access" {
   depends_on = [azurerm_data_factory.adf]
 }
 
+resource "azurerm_role_assignment" "adf_to_databricks_workspace" {
+  scope                = var.databricks_workspace_id
+  role_definition_name = "Contributor"
+  principal_id         = azurerm_data_factory.adf.identity[0].principal_id
+
+  depends_on = [
+    azurerm_data_factory.adf
+  ]
+}
+
 # ------------------------------------------------------------------------------------------------
 # Monitoring Data Factory
 # ------------------------------------------------------------------------------------------------

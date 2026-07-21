@@ -59,6 +59,22 @@ resource "azurerm_data_factory_linked_service_key_vault" "ls_kv" {
 }
 
 
+resource "azurerm_data_factory_linked_service_azure_databricks" "ls_databricks" {
+  name                     = "ls-databricks-${var.environment}"
+  data_factory_id          = var.adf_id
+  integration_runtime_name = var.integration_runtime_name
+  
+  # El dominio del workspace (Azure requiere la URL base)
+  adb_domain               = "https://${var.databricks_workspace_url}"
+  
+  # Autenticación nativa por Managed Identity (clave para entornos privados)
+  msi_work_space_resource_id = var.databricks_workspace_id
+
+  # Si estás usando el clúster interactivo existente que pasamos por variable:
+  existing_cluster_id      = var.cluster_id
+}
+
+
 resource "azurerm_data_factory_linked_custom_service" "ls_mongo_onprem" {
   count = var.enable_mongo_linked_service ? 1 : 0
 
@@ -71,12 +87,12 @@ resource "azurerm_data_factory_linked_custom_service" "ls_mongo_onprem" {
     connectionString = {
       type = "AzureKeyVaultSecret"
       store = {
-        referenceName = "ls-keyvault" # El nombre de un LS hacia el Key Vault
+        referenceName = "ls-keyvault"
         type          = "LinkedServiceReference"
       }
       secretName = "mongo-connection-string"
     }
-    database = "ecommerce_suscripciones"
+    database = "mongo-migrate"
   })
 
   depends_on = [azurerm_data_factory_linked_service_key_vault.ls_kv]
@@ -109,14 +125,15 @@ resource "azurerm_data_factory_custom_dataset" "ds_adls_sink" {
   }
 
   parameters = {
-    fileName = "String"
+    fileName   = "String"
+    folderPath = "String"
   }
 
   type_properties_json = jsonencode({
     location = {
       type       = "AzureBlobFSLocation"
       fileSystem = "bronze"
-      folderPath = "mongodb"
+      folderPath = "@dataset().folderPath"
       fileName   = "@dataset().fileName"
     }
     encodingName = "UTF-8"
@@ -163,8 +180,9 @@ resource "azurerm_data_factory_dataset_json" "ds_watermark" {
 
 
 
-
+# --------------------------------------------------------------------------------
 # Pipeline
+# --------------------------------------------------------------------------------
 
 resource "azurerm_data_factory_pipeline" "pl_mongo_incremental" {
   count           = var.enable_mongo_linked_service ? 1 : 0
@@ -244,7 +262,10 @@ resource "azurerm_data_factory_pipeline" "pl_mongo_incremental" {
               {
                 referenceName = "ds_adls_sink_generic"
                 type          = "DatasetReference"
-                parameters    = { fileName = "@concat(item(), '_incr_', '.json')" }
+                parameters = {
+                  fileName   = "@concat(item(), '_incr_', formatDateTime(utcnow(), 'yyyyMMddHHmmss'), '.json')"
+                  folderPath = "@concat('mongodb/', item(), '/year=', formatDateTime(utcnow(),'yyyy'), '/month=', formatDateTime(utcnow(),'MM'), '/day=', formatDateTime(utcnow(),'dd'))"
+                }
               }
             ]
           }
