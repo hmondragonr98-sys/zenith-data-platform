@@ -188,7 +188,6 @@ resource "azurerm_data_factory_pipeline" "pl_mongo_incremental" {
   count           = var.enable_mongo_linked_service ? 1 : 0
   name            = "pl-mongo-incremental"
   data_factory_id = var.adf_id
-  description     = "Copia incremental de MongoDB hacia Bronze usando watermark por colección"
 
   parameters = {
     collections = jsonencode(var.mongo_collections)
@@ -225,73 +224,109 @@ resource "azurerm_data_factory_pipeline" "pl_mongo_incremental" {
       }
     },
     {
-      name = "ForEach_Collection"
-      type = "ForEach"
-      dependsOn = [
-        { activity = "Lookup_Watermark", dependencyConditions = ["Succeeded"] }
-      ]
-      typeProperties = {
-        items        = { value = "@pipeline().parameters.collections", type = "Expression" }
-        isSequential = false
-        activities = [
+      "name": "ForEach_Collection",
+      "type": "ForEach",
+      "dependsOn": [
+        { "activity": "Lookup_Watermark", "dependencyConditions": ["Succeeded"] }
+      ],
+      "typeProperties": {
+        "items": { "value": "@pipeline().parameters.collections", "type": "Expression" },
+        "isSequential": false,
+        "activities": [
           {
-            name = "Copy_Incremental"
-            type = "Copy"
-            typeProperties = {
-              source = {
-                type   = "MongoDbV2Source"
-                filter = "@concat('{ \"created_at\": { \"$gt\": { \"$date\": \"', activity('Lookup_Watermark').output.firstRow[item()], '\" } } }')"
-              }
-              sink = {
-                type = "JsonSink"
-                storeSettings = {
-                  type         = "AzureBlobFSWriteSettings"
-                  copyBehavior = "MergeFiles"
-                }
-                formatSettings = { type = "JsonWriteSettings" }
-              }
+            "name": "Check_New_Rows",
+            "type": "Lookup",
+            "typeProperties": {
+              "source": {
+                "type": "MongoDbV2Source",
+                "query": "@concat('{ \"created_at\": { \"$gt\": { \"$date\": \"', activity('Lookup_Watermark').output.firstRow[item()], '\" } } }')"
+              },
+              "dataset": {
+                "referenceName": "ds_mongo_generic",
+                "type": "DatasetReference",
+                "parameters": { "collectionName": "@item()" }
+              },
+              "firstRowOnly": false
             }
-            inputs = [
-              {
-                referenceName = "ds_mongo_generic"
-                type          = "DatasetReference"
-                parameters    = { collectionName = "@item()" }
-              }
-            ]
-            outputs = [
-              {
-                referenceName = "ds_adls_sink_generic"
-                type          = "DatasetReference"
-                parameters = {
-                  fileName   = "@concat(item(), '_incr_', formatDateTime(utcnow(), 'yyyyMMddHHmmss'), '.json')"
-                  folderPath = "@concat('mongodb/', item(), '/year=', formatDateTime(utcnow(),'yyyy'), '/month=', formatDateTime(utcnow(),'MM'), '/day=', formatDateTime(utcnow(),'dd'))"
+          },
+          {
+            "name": "If_Has_Data",
+            "type": "IfCondition",
+            "dependsOn": [
+              { "activity": "Check_New_Rows", "dependencyConditions": ["Succeeded"] }
+            ],
+            "typeProperties": {
+              "expression": {
+                "value": "@greater(length(activity('Check_New_Rows').output.value), 0)",
+                "type": "Expression"
+              },
+              "ifTrueActivities": [
+                {
+                  "name": "Copy_Incremental",
+                  "type": "Copy",
+                  "typeProperties": {
+                    "source": {
+                      "type": "MongoDbV2Source",
+                      "filter": "@concat('{ \"created_at\": { \"$gt\": { \"$date\": \"', activity('Lookup_Watermark').output.firstRow[item()], '\" } } }')"
+                    },
+                    "sink": {
+                      "type": "JsonSink",
+                      "storeSettings": {
+                        "type": "AzureBlobFSWriteSettings",
+                        "copyBehavior": "MergeFiles"
+                      },
+                      "formatSettings": { "type": "JsonWriteSettings" }
+                    }
+                  },
+                  "inputs": [
+                    {
+                      "referenceName": "ds_mongo_generic",
+                      "type": "DatasetReference",
+                      "parameters": { "collectionName": "@item()" }
+                    }
+                  ],
+                  "outputs": [
+                    {
+                      "referenceName": "ds_adls_sink_generic",
+                      "type": "DatasetReference",
+                      "parameters": {
+                        "fileName": "@concat(item(), '_incr_', formatDateTime(utcnow(), 'yyyyMMddHHmmss'), '.json')",
+                        "folderPath": "@concat('mongodb/', item(), '/year=', formatDateTime(utcnow(),'yyyy'), '/month=', formatDateTime(utcnow(),'MM'), '/day=', formatDateTime(utcnow(),'dd'))"
+                      }
+                    }
+                  ]
                 }
-              }
-            ]
+              ],
+              "ifFalseActivities": []
+            }
           }
         ]
       }
     },
     {
-      name = "Update_Watermark"
-      type = "WebActivity"
-      dependsOn = [
-        { activity = "ForEach_Collection", dependencyConditions = ["Succeeded"] }
-      ]
-      typeProperties = {
-        url    = "https://${var.storage_account_name}.dfs.core.windows.net/control/watermark.json"
-        method = "PUT"
-        headers = {
-          "x-ms-version"   = "2021-08-06"
-          "x-ms-blob-type" = "BlockBlob"
-          "Content-Type"   = "application/json"
-        }
-        body = jsonencode({
+      "name": "Update_Watermark",
+      "type": "WebActivity",
+      "dependsOn": [
+        { "activity": "ForEach_Collection", "dependencyConditions": ["Succeeded"] }
+      ],
+      "typeProperties": {
+        "url": "https://${var.storage_account_name}.dfs.core.windows.net/control/watermark.json",
+        "method": "PUT",
+        "headers": {
+          "x-ms-version": "2021-08-06",
+          "x-ms-blob-type": "BlockBlob",
+          "Content-Type": "application/json"
+        },
+        "body": jsonencode({
           for coll in var.mongo_collections : coll => "@{variables('vRunStart')}"
-        })
-        authentication = {
-          type     = "MSI"
-          resource = "https://storage.azure.com/"
+        }),
+        "authentication": {
+          "type": "MSI",
+          "resource": "https://storage.azure.com/"
+        },
+        "connectVia": {
+          "referenceName": "${var.integration_runtime_name}",
+          "type": "IntegrationRuntimeReference"
         }
       }
     }
@@ -302,5 +337,5 @@ resource "azurerm_data_factory_pipeline" "pl_mongo_incremental" {
     azurerm_data_factory_custom_dataset.ds_adls_sink,
     azurerm_data_factory_dataset_json.ds_watermark
   ]
+  
 }
-

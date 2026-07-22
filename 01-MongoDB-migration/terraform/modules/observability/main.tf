@@ -58,6 +58,7 @@ resource "azurerm_consumption_budget_resource_group" "budget" {
 # Alert Rules: Log Analytics for system failures (ADF)
 # ------------------------------------------------------------------------------------------------
 
+
 resource "azurerm_monitor_scheduled_query_rules_alert" "system_failure_alert" {
   name                = "alert-system-pipeline-failures"
   location            = var.location
@@ -66,15 +67,16 @@ resource "azurerm_monitor_scheduled_query_rules_alert" "system_failure_alert" {
   # Id found on this module
   data_source_id      = azurerm_log_analytics_workspace.logs.id
 
-  # Frequency and window time
+  # Frequency and window time (en minutos)
   frequency           = 5
   time_window         = 5
 
-  # KQL querie for failure detection
+  # KQL query for failure detection
   query = <<-QUERY
     AzureDiagnostics
     | where ResourceProvider == "MICROSOFT.DATAFACTORY" and Category == "PipelineRuns"
     | where status_s == "Failed"
+    | where pipelineName_s == "pl-mongo-incremental"
     | project TimeGenerated, Resource, pipelineName_s, error_s
   QUERY
 
@@ -84,7 +86,7 @@ resource "azurerm_monitor_scheduled_query_rules_alert" "system_failure_alert" {
   }
 
   action {
-    action_group           = [azurerm_monitor_action_group.email_alert.id]
+    action_group             = [azurerm_monitor_action_group.email_alert.id]
     custom_webhook_payload = "{}"
   }
 }
